@@ -1,0 +1,41 @@
+{
+  "name": "hapi-ray",
+  "version": "1.0.12",
+  "description": "Forked from the excellent hapi-xray @ version 1.0.11",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha './{,!(node_modules)/**}/test.js'",
+    "test:lint": "standard",
+    "versionbump:fix": "npm version patch --no-git-tag-version",
+    "versionbump:feature": "npm version minor --no-git-tag-version",
+    "versionbump:breakingchanges": "npm version major --no-git-tag-version",
+    "npm-publish": "npm publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lorengreenfield/hapi-ray.git"
+  },
+  "keywords": [
+    "hapi",
+    "aws-xray"
+  ],
+  "author": "lorengreenfield",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lorengreenfield/hapi-ray/issues"
+  },
+  "homepage": "https://github.com/lorengreenfield/hapi-ray#readme",
+  "devDependencies": {
+    "aws-xray-sdk": "^2.3.4",
+    "babel-eslint": "^10.0.2",
+    "eslint": "^6.1.0",
+    "standard": "^13.1.0"
+  },
+  "peerDependencies": {
+    "aws-xray-sdk": "^2.3.4"
+  },
+  "standard": {
+    "parser": "babel-eslint"
+  },
+  "dependencies": {}
+}
