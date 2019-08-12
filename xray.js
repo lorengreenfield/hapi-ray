@@ -58,7 +58,7 @@ module.exports = {
 
       xray.setSegment(segment)
 
-      if(!request.response || !request.response.events){
+      if (!request.response || !request.response.events) {
         return h.continue
       }
 
