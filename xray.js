@@ -22,49 +22,9 @@ module.exports = {
     if (options.captureAWS) {
       xray.captureAWS(require('aws-sdk'))
     }
-
-    server.events.on('response', req => {
-      if (!req.segment) {
-        return
-      }
-
-      if (req.response.statusCode === 429) {
-        req.segment.addThrottleFlag()
-      }
-
-      if (req.response && req.response.isBoom && req.response.statusCode !== 404) {
-        const cause = xray.utils.getCauseTypeFromHttpStatus(
-          req.response.statusCode
-        )
-
-        if (cause) {
-          req.segment[cause] = true
-        }
-
-        req.segment.close(req.response)
-
-        xray.getLogger().debug(`Closed hapi segment with error: {
-  url: ${req.url.toString()},
-  name: ${req.segment.name},
-  trace_id: ${req.segment.trace_id},
-  id: ${req.segment.id},
-  sampled: ${!req.segment.notTraced}
-}`)
-      } else {
-        req.segment.close()
-
-        xray.getLogger().debug(`Closed hapi segment: {
-  url: ${req.url.toString()},
-  name: ${req.segment.name},
-  trace_id: ${req.segment.trace_id},
-  id: ${req.segment.id},
-  sampled: ${!req.segment.notTraced}
-}`)
-      }
-    })
   },
 
-  createRequestHandler: function () {
+  createResponseHandler: function () {
     return async (request, h) => {
       const header = xray.middleware.processHeaders(request)
       const name = xray.middleware.resolveName(request.headers.host)
@@ -97,6 +57,50 @@ module.exports = {
       ns.enter(context)
 
       xray.setSegment(segment)
+
+      if(!request.response || !request.response.events){
+        return h.continue
+      }
+
+      request.response.events.once('finish', function () {
+        if (!request.segment) {
+          return
+        }
+
+        if (request.response.statusCode === 429) {
+          request.segment.addThrottleFlag()
+        }
+
+        if (request.response && request.response.isBoom && request.response.statusCode !== 404) {
+          const cause = xray.utils.getCauseTypeFromHttpStatus(
+            request.response.statusCode
+          )
+
+          if (cause) {
+            request.segment[cause] = true
+          }
+
+          request.segment.close(request.response)
+
+          xray.getLogger().debug(`Closed hapi segment with error: {
+  url: ${request.url.toString()},
+  name: ${request.segment.name},
+  trace_id: ${request.segment.trace_id},
+  id: ${request.segment.id},
+  sampled: ${!request.segment.notTraced}
+}`)
+        } else {
+          request.segment.close()
+
+          xray.getLogger().debug(`Closed hapi segment: {
+  url: ${request.url.toString()},
+  name: ${request.segment.name},
+  trace_id: ${request.segment.trace_id},
+  id: ${request.segment.id},
+  sampled: ${!request.segment.notTraced}
+}`)
+        }
+      })
 
       return h.continue
     }
