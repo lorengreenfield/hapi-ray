@@ -7,7 +7,7 @@ const xray = require('aws-xray-sdk')
 xray.capturePromise()
 
 module.exports = {
-  setup: function (options) {
+  setup: function (server, options) {
     const segmentName = options.segmentName || this._createSegmentName()
     xray.middleware.setDefaultName(segmentName)
 
@@ -22,6 +22,39 @@ module.exports = {
     if (options.captureAWS) {
       xray.captureAWS(require('aws-sdk'))
     }
+
+    server.events.on('response', req => {
+      if (!req.segment) {
+        return
+      }
+
+      if (req.response.statusCode === 429) {
+        req.segment.addThrottleFlag()
+      }
+
+      const cause = xray.utils.getCauseTypeFromHttpStatus(
+        req.response.statusCode
+      )
+
+      if (cause) {
+        req.segment[cause] = true
+      }
+
+      if (req.response && req.response._error && req.response.statusCode !== 404) {
+        req.segment.addError(req.response._error)
+      }
+
+      req.segment.http.close(req.raw.res)
+      req.segment.close()
+
+      xray.getLogger().debug(`Closed hapi segment successfully: {
+  url: ${req.url.toString()},
+  name: ${req.segment.name},
+  trace_id: ${req.segment.trace_id},
+  id: ${req.segment.id},
+  sampled: ${!req.segment.notTraced}
+}`)
+    })
   },
 
   createRequestHandler: function () {
@@ -30,6 +63,7 @@ module.exports = {
       const name = xray.middleware.resolveName(request.headers.host)
 
       const segment = new xray.Segment(name, header.Root, header.Parent)
+      request.segment = segment
 
       xray.middleware.resolveSampling(header, segment, {
         req: request.raw.req
@@ -39,44 +73,13 @@ module.exports = {
         new xray.middleware.IncomingRequestData(request.raw.req)
       )
 
-      request.segment = segment
-
       xray.getLogger().debug(`Starting hapi segment: {
-        url: ${request.url},
-        name: ${segment.name},
-        trace_id: ${segment.trace_id},
-        id: ${segment.id},
-        sampled: ${!segment.notTraced}
-      }`)
-
-      request.server.events.once('response', req => {
-        if (req.response.statusCode === 429) {
-          req.segment.addThrottleFlag()
-        }
-
-        const cause = xray.utils.getCauseTypeFromHttpStatus(
-          req.response.statusCode
-        )
-
-        if (cause) {
-          req.segment[cause] = true
-        }
-
-        if (req.response && req.response._error && req.response.statusCode !== 404) {
-          req.segment.addError(req.response._error)
-        }
-
-        req.segment.http.close(req.raw.res)
-        req.segment.close()
-
-        xray.getLogger().debug(`Closed hapi segment successfully: {
-          url: ${req.url},
-          name: ${req.segment.name},
-          trace_id: ${req.segment.trace_id},
-          id: ${req.segment.id},
-          sampled: ${!req.segment.notTraced}
-        }`)
-      })
+  url: ${request.url.toString()},
+  name: ${segment.name},
+  trace_id: ${segment.trace_id},
+  id: ${segment.id},
+  sampled: ${!segment.notTraced}
+}`)
 
       const ns = xray.getNamespace()
       const context = ns.createContext()

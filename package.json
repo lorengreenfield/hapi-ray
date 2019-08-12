@@ -1,6 +1,6 @@
 {
   "name": "hapi-ray",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Forked from the excellent hapi-xray @ version 1.0.11",
   "main": "index.js",
   "scripts": {
