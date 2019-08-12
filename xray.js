@@ -32,28 +32,35 @@ module.exports = {
         req.segment.addThrottleFlag()
       }
 
-      const cause = xray.utils.getCauseTypeFromHttpStatus(
-        req.response.statusCode
-      )
+      if (req.response && req.response.isBoom && req.response.statusCode !== 404) {
+        const cause = xray.utils.getCauseTypeFromHttpStatus(
+          req.response.statusCode
+        )
 
-      if (cause) {
-        req.segment[cause] = true
-      }
+        if (cause) {
+          req.segment[cause] = true
+        }
 
-      if (req.response && req.response._error && req.response.statusCode !== 404) {
-        req.segment.addError(req.response._error)
-      }
+        req.segment.close(req.response)
 
-      req.segment.http.close(req.raw.res)
-      req.segment.close()
-
-      xray.getLogger().debug(`Closed hapi segment successfully: {
+        xray.getLogger().debug(`Closed hapi segment with error: {
   url: ${req.url.toString()},
   name: ${req.segment.name},
   trace_id: ${req.segment.trace_id},
   id: ${req.segment.id},
   sampled: ${!req.segment.notTraced}
 }`)
+      } else {
+        req.segment.close()
+
+        xray.getLogger().debug(`Closed hapi segment: {
+  url: ${req.url.toString()},
+  name: ${req.segment.name},
+  trace_id: ${req.segment.trace_id},
+  id: ${req.segment.id},
+  sampled: ${!req.segment.notTraced}
+}`)
+      }
     })
   },
 
