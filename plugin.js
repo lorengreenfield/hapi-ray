@@ -5,6 +5,11 @@ module.exports = {
     xray.setup(server, options)
 
     server.ext({
+      type: 'onRequest',
+      method: xray.createRequestHandler()
+    })
+
+    server.ext({
       type: 'onPreResponse',
       method: xray.createResponseHandler()
     })

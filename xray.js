@@ -3,12 +3,9 @@ const path = require('path')
 
 const xray = require('aws-xray-sdk')
 
-// Setup XRay
-xray.capturePromise()
-
 module.exports = {
   setup: function (server, options) {
-    const segmentName = options.segmentName || this._createSegmentName()
+    const segmentName = options.segmentName || createSegmentName()
     xray.middleware.setDefaultName(segmentName)
 
     if (options.plugins) {
@@ -24,16 +21,21 @@ module.exports = {
     }
   },
 
-  createResponseHandler: function () {
-    return async (request, h) => {
+  createRequestHandler: () => {
+    return async function (request, h) {
       const header = xray.middleware.processHeaders(request)
       const name = xray.middleware.resolveName(request.headers.host)
 
       const segment = new xray.Segment(name, header.Root, header.Parent)
       request.segment = segment
-
       xray.middleware.resolveSampling(header, segment, {
-        req: request.raw.req
+        req: {
+          headers: {
+            host: request.headers.host,
+            httpMethod: request.method,
+            urlPath: request.url.toString()
+          }
+        }
       })
 
       segment.addIncomingRequestData(
@@ -49,70 +51,54 @@ module.exports = {
 }`)
 
       const ns = xray.getNamespace()
-      const context = ns.createContext()
-
       ns.bindEmitter(request.raw.req)
       ns.bindEmitter(request.raw.res)
-
+      const context = ns.createContext()
       ns.enter(context)
-
+      request.context = context
       xray.setSegment(segment)
-
-      if (!request.response || !request.response.events) {
-        return h.continue
-      }
-
-      request.response.events.once('finish', function () {
-        if (!request.segment) {
-          return
-        }
-
-        if (request.response.statusCode === 429) {
-          request.segment.addThrottleFlag()
-        }
-
-        if (request.response && request.response.isBoom && request.response.statusCode !== 404) {
-          const cause = xray.utils.getCauseTypeFromHttpStatus(
-            request.response.statusCode
-          )
-
-          if (cause) {
-            request.segment[cause] = true
-          }
-
-          request.segment.close(request.response)
-
-          xray.getLogger().debug(`Closed hapi segment with error: {
-  url: ${request.url.toString()},
-  name: ${request.segment.name},
-  trace_id: ${request.segment.trace_id},
-  id: ${request.segment.id},
-  sampled: ${!request.segment.notTraced}
-}`)
-        } else {
-          request.segment.close()
-
-          xray.getLogger().debug(`Closed hapi segment: {
-  url: ${request.url.toString()},
-  name: ${request.segment.name},
-  trace_id: ${request.segment.trace_id},
-  id: ${request.segment.id},
-  sampled: ${!request.segment.notTraced}
-}`)
-        }
-      })
 
       return h.continue
     }
   },
 
-  _createSegmentName: function () {
-    let segmentName = 'service'
-    const pkgPath = path.join(process.cwd(), 'package.json')
-    if (fs.existsSync(pkgPath)) {
-      const pjson = require(pkgPath)
-      segmentName = `${pjson.name || 'service'}_${pjson.version || 'v1'}`
+  createResponseHandler: () => {
+    return async function (request, h) {
+      const ns = xray.getNamespace()
+
+      if (request.response.isBoom && xray.utils.getCausesTypeFromHttpStatus(request.response.output.statusCode)) {
+        if (request.response.output.statusCode === 429) {
+          request.segment.addThrottleFlag()
+        }
+        request.segment[xray.utils.getCauseTypeFromHttpStatus(request.response.output.statusCode)] = true
+        close({ ns, request, err: request.response })
+        return h.continue
+      }
+
+      if (!request.segment) {
+        return h.continue
+      }
+
+      close({ ns, request })
+      return h.continue
     }
-    return segmentName
   }
+}
+
+function createSegmentName () {
+  let segmentName = 'service'
+  const pkgPath = path.join(process.cwd(), 'package.json')
+  if (fs.existsSync(pkgPath)) {
+    const pjson = require(pkgPath)
+    segmentName = `${pjson.name || 'service'}_${pjson.version || 'v1'}`
+  }
+  return segmentName
+}
+
+function close ({ ns, request, err }) {
+  request.segment.http.close(request.response)
+  request.segment.close(err)
+  ns.exit(request.context)
+  request.segment = null
+  request.context = null
 }
