@@ -66,7 +66,7 @@ module.exports = {
     return async function (request, h) {
       const ns = xray.getNamespace()
 
-      if (request.response.isBoom && xray.utils.getCausesTypeFromHttpStatus(request.response.output.statusCode)) {
+      if (request.response.isBoom && xray.utils.getCauseTypeFromHttpStatus(request.response.output.statusCode)) {
         if (request.response.output.statusCode === 429) {
           request.segment.addThrottleFlag()
         }
