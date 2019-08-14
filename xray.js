@@ -28,7 +28,9 @@ module.exports = {
 
       const segment = new xray.Segment(name, header.Root, header.Parent)
       request.segment = segment
-      xray.middleware.resolveSampling(header, segment, request.raw.req)
+      xray.middleware.resolveSampling(header, segment, {
+        req: request.raw.req
+      })
 
       segment.addIncomingRequestData(
         new xray.middleware.IncomingRequestData(request.raw.req)
