@@ -1,6 +1,6 @@
 {
   "name": "hapi-ray",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "Forked from the excellent hapi-xray @ version 1.0.11",
   "main": "index.js",
   "scripts": {
@@ -26,13 +26,13 @@
   },
   "homepage": "https://github.com/lorengreenfield/hapi-ray#readme",
   "devDependencies": {
-    "aws-xray-sdk": "^2.3.4-experimental.1",
+    "aws-xray-sdk": "^2.3.4",
     "babel-eslint": "^10.0.2",
     "eslint": "^6.1.0",
     "standard": "^13.1.0"
   },
   "peerDependencies": {
-    "aws-xray-sdk": "^2.3.4-experimental.1"
+    "aws-xray-sdk": "^2.3.4"
   },
   "standard": {
     "parser": "babel-eslint"
